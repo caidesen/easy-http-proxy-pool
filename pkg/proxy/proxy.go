@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"sync"
@@ -189,19 +190,57 @@ func HijackConnectHandle(ctx *ProxyCtx, clientConn net.Conn) {
 	}
 }
 
+func createNewReq(r *http.Request) (*http.Request, error) {
+	request, err := http.NewRequest(r.Method, r.URL.String(), r.Body)
+	if err != nil {
+		return nil, err
+	}
+	request.URL = r.URL
+	request.Header = r.Header
+	return request, err
+}
+
+func doRequest(r *http.Request, tr *http.Transport) (*http.Response, error) {
+	client := &http.Client{Timeout: 4 * time.Second, Transport: tr}
+	return client.Do(r)
+}
+
+func getProxyUrl(ctx *ProxyCtx) (*url.URL, error) {
+	addr, err := ctx.Pool.GetAddress()
+	ctx.Debug(fmt.Sprintf("获取代理地址: %s", addr))
+	if err != nil {
+		ctx.Warn(fmt.Sprintf("获取代理地址失败: %s", err))
+		return nil, err
+	}
+	proxyUrl, err := url.Parse("http://" + addr)
+	if err != nil {
+		return nil, err
+	}
+	return proxyUrl, nil
+}
+
 func HttpRequestHandle(ctx *ProxyCtx, w http.ResponseWriter) {
-	request, err := http.NewRequest(ctx.Req.Method, ctx.Req.URL.String(), ctx.Req.Body)
+	r, err := createNewReq(ctx.Req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	request.Header = ctx.Req.Header
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
-	client := &http.Client{Timeout: 4 * time.Second, Transport: tr}
-	res, err := client.Do(request)
+	// 检查是否需要代理
+	if checkHostnameNeedProxy(ctx) {
+		proxyUrl, err := getProxyUrl(ctx)
+		if err != nil {
+			ctx.Warn(fmt.Sprintf("当前远程代理不可用，降级为本地请求: %s", err))
+		} else {
+			tr.Proxy = http.ProxyURL(proxyUrl)
+		}
+	}
+	ctx.Debug("发起代理请求")
+	res, err := doRequest(r, tr)
 	if err != nil {
+		ctx.Warn(fmt.Sprintf("代理请求失败: %s", err))
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
