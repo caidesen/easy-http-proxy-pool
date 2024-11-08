@@ -1,0 +1,10 @@
+{
+  "proxyHost": [],
+  "proxySources": [
+    {
+      "name": "",
+      "fetchURL": "",
+      "ttl": 30
+    }
+  ]
+}
