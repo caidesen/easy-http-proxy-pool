@@ -42,11 +42,16 @@ func (s *ProxyServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 	HijackConnectHandle(ctx, proxyClient)
 }
 
+func (s *ProxyServer) handleHttp(w http.ResponseWriter, r *http.Request) {
+	ctx := &ProxyCtx{Req: r, Pool: s.pool, conf: s.conf, TraceId: uuid.New().String()}
+	HttpRequestHandle(ctx, w)
+}
+
 func (s *ProxyServer) httpRequestHandle(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodConnect {
 		s.handleConnect(w, r)
 	} else {
-		// todo: 普通的转发 模式
+		s.handleHttp(w, r)
 	}
 }
 

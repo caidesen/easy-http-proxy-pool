@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -186,4 +187,25 @@ func HijackConnectHandle(ctx *ProxyCtx, clientConn net.Conn) {
 		go copyAndClose(ctx, targetTCP, proxyClientTCP)
 		go copyAndClose(ctx, proxyClientTCP, targetTCP)
 	}
+}
+
+func HttpRequestHandle(ctx *ProxyCtx, w http.ResponseWriter) {
+	request, err := http.NewRequest(ctx.Req.Method, ctx.Req.URL.String(), ctx.Req.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	request.Header = ctx.Req.Header
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Timeout: 4 * time.Second, Transport: tr}
+	res, err := client.Do(request)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer res.Body.Close()
+	w.WriteHeader(res.StatusCode)
+	io.Copy(w, res.Body)
 }
