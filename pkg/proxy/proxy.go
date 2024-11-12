@@ -292,11 +292,11 @@ func HttpRequestHandle(ctx *ProxyCtx, w http.ResponseWriter) {
 			"headers", res.Header,
 			"body", bodyText)
 	}
-	w.WriteHeader(res.StatusCode)
 	for k, vv := range res.Header {
 		for _, v := range vv {
 			w.Header().Add(k, v)
 		}
 	}
+	w.WriteHeader(res.StatusCode)
 	w.Write(bodyBytes)
 }
