@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -117,7 +118,6 @@ func createProxyTunnel(ctx *ProxyCtx, addr string) (net.Conn, error) {
 	}
 	ctx.Debug(fmt.Sprintf("tcp连接成功 %s", addr))
 	reqBytes := createHttpConnectBytes(ctx.Req)
-	ctx.Debug(fmt.Sprintf("http请求报文 %s", string(reqBytes)))
 	_, err = targetConn.Write(reqBytes)
 	if err != nil {
 		ctx.Warn(fmt.Sprintf("代理隧道建立失败 %s: %s", addr, err.Error()))
@@ -202,7 +202,7 @@ func HijackConnectHandle(ctx *ProxyCtx, clientConn net.Conn) {
 }
 
 func createNewReq(r *http.Request) (*http.Request, error) {
-	request, err := http.NewRequest(r.Method, r.URL.String(), r.Body)
+	request, err := http.NewRequest(r.Method, "", r.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -230,8 +230,20 @@ func getProxyUrl(ctx *ProxyCtx) (*url.URL, error) {
 	return proxyUrl, nil
 }
 
+func tryUnzip(r io.Reader) []byte {
+	gzipReader, err := gzip.NewReader(r)
+	if err != nil {
+		return nil
+	}
+	unzipped, err := io.ReadAll(gzipReader)
+	if err != nil {
+		return nil
+	}
+	return unzipped
+}
+
 func HttpRequestHandle(ctx *ProxyCtx, w http.ResponseWriter) {
-	r, err := createNewReq(ctx.Req)
+	req, err := createNewReq(ctx.Req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -249,35 +261,36 @@ func HttpRequestHandle(ctx *ProxyCtx, w http.ResponseWriter) {
 		}
 	}
 	if conf.IsDebug {
-		bodyBytes, err := io.ReadAll(r.Body)
+		bodyBytes, err := io.ReadAll(req.Body)
+		req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 		if err != nil {
 			return
 		}
 		ctx.Debug("发起代理请求",
-			"method", r.Method,
-			"url", r.URL.String(),
-			"headers", r.Header,
-			"body", string(bodyBytes))
+			"method", req.Method,
+			"url", req.URL.String(),
+			"headers", req.Header,
+			"body", "")
 	}
-	res, err := doRequest(r, tr)
+	res, err := doRequest(req, tr)
 	if err != nil {
 		ctx.Warn(fmt.Sprintf("代理请求失败: %s", err))
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer res.Body.Close()
+	bodyBytes, err := io.ReadAll(res.Body)
 	if conf.IsDebug {
-		bodyBytes, err := io.ReadAll(res.Body)
-		newBody := io.NopCloser(bytes.NewBuffer(bodyBytes))
-		defer newBody.Close()
-		if err != nil {
-			return
+		var bodyText string
+		if res.Header.Get("Content-Encoding") == "gzip" {
+			bodyText = string(tryUnzip(io.NopCloser(bytes.NewBuffer(bodyBytes))))
+		} else {
+			bodyText = string(bodyBytes)
 		}
 		ctx.Debug("代理请求结束",
 			"statusCode", res.StatusCode,
 			"headers", res.Header,
-			"body", string(bodyBytes))
-		res.Body = newBody
+			"body", bodyText)
 	}
 	w.WriteHeader(res.StatusCode)
 	for k, vv := range res.Header {
@@ -285,5 +298,5 @@ func HttpRequestHandle(ctx *ProxyCtx, w http.ResponseWriter) {
 			w.Header().Add(k, v)
 		}
 	}
-	io.Copy(w, res.Body)
+	w.Write(bodyBytes)
 }
