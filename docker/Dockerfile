@@ -9,5 +9,6 @@ COPY --from=builder /app/build/proxy-pool .
 RUN mkdir -p /etc/proxy-pool
 VOLUME /etc/proxy-pool
 ENV PROXY_SERVER_DEBUG=false
+ENV TZ=Asia/Shanghai
 EXPOSE 8001
 CMD chmod +x ./proxy-pool && ./proxy-pool -config /etc/proxy-pool/config.json -port 8001 -host 0.0.0.0

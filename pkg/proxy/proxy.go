@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"jd-auto-proxy/pkg/conf"
 	"net"
 	"net/http"
 	"net/url"
@@ -150,12 +151,15 @@ func tryCreateProxyTunnel(ctx *ProxyCtx) (net.Conn, error) {
 // checkHostnameNeedProxy 检查是否需要代理
 func checkHostnameNeedProxy(ctx *ProxyCtx) bool {
 	host := ctx.Req.Host
+	ctx.Debug(fmt.Sprintf("检查主机名 %s 是否需要代理", host))
 	for _, regStr := range ctx.conf.ProxyHost {
 		reg := regexp.MustCompile(regStr)
 		if reg.MatchString(host) {
+			ctx.Debug(fmt.Sprintf("主机名 %s 命中代理规则 %s", host, regStr))
 			return true
 		}
 	}
+	ctx.Debug(fmt.Sprintf("主机名 %s 不符合代理规则", host))
 	return false
 }
 
@@ -244,12 +248,32 @@ func HttpRequestHandle(ctx *ProxyCtx, w http.ResponseWriter) {
 			tr.Proxy = http.ProxyURL(proxyUrl)
 		}
 	}
-	ctx.Debug("发起代理请求")
+	if conf.IsDebug {
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			return
+		}
+		ctx.Debug("发起代理请求",
+			"method", r.Method,
+			"url", r.URL.String(),
+			"headers", r.Header,
+			"body", string(bodyBytes))
+	}
 	res, err := doRequest(r, tr)
 	if err != nil {
 		ctx.Warn(fmt.Sprintf("代理请求失败: %s", err))
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if conf.IsDebug {
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			return
+		}
+		ctx.Debug("代理请求结束",
+			"statusCode", res.StatusCode,
+			"headers", res.Header,
+			"body", string(bodyBytes))
 	}
 	defer res.Body.Close()
 	w.WriteHeader(res.StatusCode)
