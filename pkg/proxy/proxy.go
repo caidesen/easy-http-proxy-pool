@@ -5,9 +5,11 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"jd-auto-proxy/pkg/conf"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -159,7 +161,7 @@ func checkHostnameNeedProxy(ctx *ProxyCtx) bool {
 			return true
 		}
 	}
-	ctx.Debug(fmt.Sprintf("主机名 %s 不符合代理规则", host))
+	ctx.Debug(fmt.Sprintf("主机名 %s 未命中代理规则", host))
 	return false
 }
 
@@ -266,11 +268,12 @@ func HttpRequestHandle(ctx *ProxyCtx, w http.ResponseWriter) {
 		if err != nil {
 			return
 		}
+		headerText, _ := json.Marshal(req.Header)
 		ctx.Debug("发起代理请求",
-			"method", req.Method,
-			"url", req.URL.String(),
-			"headers", req.Header,
-			"body", "")
+			slog.String("method", req.Method),
+			slog.String("url", req.URL.String()),
+			slog.String("headers", string(headerText)),
+			slog.String("body", string(bodyBytes)))
 	}
 	res, err := doRequest(req, tr)
 	if err != nil {
@@ -287,10 +290,12 @@ func HttpRequestHandle(ctx *ProxyCtx, w http.ResponseWriter) {
 		} else {
 			bodyText = string(bodyBytes)
 		}
+		headerText, _ := json.Marshal(req.Header)
 		ctx.Debug("代理请求结束",
-			"statusCode", res.StatusCode,
-			"headers", res.Header,
-			"body", bodyText)
+			slog.Int("statusCode", res.StatusCode),
+			slog.String("headers", string(headerText)),
+			slog.String("body", bodyText),
+		)
 	}
 	for k, vv := range res.Header {
 		for _, v := range vv {

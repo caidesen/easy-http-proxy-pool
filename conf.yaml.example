@@ -1,0 +1,6 @@
+proxyHost:
+  - .+\.jd\.com
+proxySources:
+  - name: ""
+    fetchURL: ""
+    ttl: 30

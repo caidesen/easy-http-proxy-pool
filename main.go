@@ -19,7 +19,6 @@ func main() {
 	if conf.IsDebug {
 		level = slog.LevelDebug
 	}
-	proxyConfig, _ := conf.ReadFromFile(conf.ConfigPath)
 	var logWriter io.Writer = os.Stdout
 	if conf.LogEnabled {
 		logWriter = &logger.DailyWriter{
@@ -31,6 +30,7 @@ func main() {
 		Level: level,
 	})
 	slog.SetDefault(slog.New(logHandler))
+	proxyConfig, _ := conf.ReadFromFile(conf.ConfigPath)
 	server := proxy.NewProxyServer(proxyConfig)
 	server.Listen(fmt.Sprintf("%s:%s", conf.Host, conf.Port))
 }

@@ -1,10 +1,11 @@
 package conf
 
 import (
-	"encoding/json"
 	"flag"
+	"gopkg.in/yaml.v3"
 	"io"
 	"log"
+	"log/slog"
 	"os"
 	"path"
 )
@@ -14,23 +15,17 @@ import (
 // ProxySource.FetchURL 加载链接
 // ProxySource.TTL 过期时间 秒
 type ProxySource struct {
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	FetchURL string `json:"fetchURL"`
-	TTL      int    `json:"ttl"`
-}
-
-// Rule 规则
-type Rule struct {
-	Host  string   `json:"host"`
-	Proxy []string `json:"proxy"`
+	Name     string `json:"name" yaml:"name"`
+	Type     string `json:"type" yaml:"type"`
+	FetchURL string `json:"fetchURL" yaml:"fetchURL"`
+	TTL      int    `json:"ttl" yaml:"TTL"`
 }
 
 // Config 配置
 // Config.PoolSize 池大小
 type Config struct {
-	ProxyHost    []string       `json:"proxyHost"`
-	ProxySources []*ProxySource `json:"proxySources"`
+	ProxyHost    []string       `json:"proxyHost" yaml:"host"`
+	ProxySources []*ProxySource `json:"proxySources" yaml:"sources"`
 }
 
 func ReadFromFile(path string) (*Config, error) {
@@ -38,8 +33,9 @@ func ReadFromFile(path string) (*Config, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		// 不在就创建一个空JSON进去
 		file, _ := os.Create(path)
-		file.Write([]byte("{}"))
+		file.Write([]byte(""))
 		file.Close()
+		slog.Info("配置文件不存在，已创建")
 	}
 	// 打开文件
 	file, err := os.Open(path)
@@ -54,7 +50,7 @@ func ReadFromFile(path string) (*Config, error) {
 	}
 	// 解码 JSON 数据
 	var c Config
-	if err := json.Unmarshal(byteValue, &c); err != nil {
+	if err := yaml.Unmarshal(byteValue, &c); err != nil {
 		log.Fatalf("解码 JSON 时出错: %v", err)
 	}
 	return &c, nil
@@ -83,7 +79,7 @@ func init() {
 	flag.BoolVar(&LogEnabled, "log", false, "log")
 	flag.BoolVar(&VersionOut, "version", false, "output version")
 	flag.StringVar(&LogDirPath, "logDir", "log", "log path")
-	flag.StringVar(&ConfigPath, "config", "conf.json", "config path")
+	flag.StringVar(&ConfigPath, "config", "conf.yaml", "config path")
 	flag.Parse()
 	LogDirPath = checkPath(LogDirPath)
 	ConfigPath = checkPath(ConfigPath)

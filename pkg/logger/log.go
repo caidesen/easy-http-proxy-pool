@@ -2,10 +2,10 @@ package logger
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
+	"sync"
 	"time"
 )
 
@@ -13,6 +13,7 @@ import (
 type QingLongLogHandler struct {
 	slog.Handler
 	out io.Writer
+	mu  sync.Mutex
 }
 type QingLongLogHandlerOptions struct {
 	SlogOpts slog.HandlerOptions
@@ -28,21 +29,15 @@ func NewQingLongLogHandler(out io.Writer, opts *slog.HandlerOptions) *QingLongLo
 
 func (q *QingLongLogHandler) Handle(ctx context.Context, r slog.Record) error {
 	levelText := r.Level.String()
-	fieldsText := ""
-	if r.NumAttrs() > 0 {
-		fields := make(map[string]interface{}, r.NumAttrs())
-		r.Attrs(func(a slog.Attr) bool {
-			fields[a.Key] = a.Value.Any()
-			return true
-		})
-		b, err := json.Marshal(fields)
-		if err != nil {
-			return err
-		}
-		fieldsText = string(b)
-	}
+	attrText := ""
+	r.Attrs(func(a slog.Attr) bool {
+		attrText += fmt.Sprintf(" %s=%s", a.Key, a.Value.String())
+		return true
+	})
 	// 年月日
 	timeStr := r.Time.Format(time.DateTime)
-	fmt.Fprintf(q.out, "[%s] [%s] [proxy] %s %s\n", levelText, timeStr, r.Message, fieldsText)
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	fmt.Fprintf(q.out, "[%s] [%s] [proxy] %s %s\n", levelText, timeStr, r.Message, attrText)
 	return nil
 }

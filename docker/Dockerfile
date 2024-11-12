@@ -12,4 +12,4 @@ VOLUME /etc/proxy-pool
 ENV PROXY_SERVER_DEBUG=false
 ENV TZ=Asia/Shanghai
 EXPOSE 8001
-CMD chmod +x ./proxy-pool && ./proxy-pool -config /etc/proxy-pool/config.json -port 8001 -host 0.0.0.0
+CMD chmod +x ./proxy-pool && ./proxy-pool -config /etc/proxy-pool/config.yaml -port 8001 -host 0.0.0.0

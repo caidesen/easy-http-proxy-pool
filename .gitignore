@@ -25,4 +25,4 @@ dist-ssr
 
 ./data
 ./build
-conf.json
+conf.yaml
