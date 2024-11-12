@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"time"
 )
 
 // QingLongLogHandler 模拟qinglong系统日志
@@ -41,7 +42,7 @@ func (q *QingLongLogHandler) Handle(ctx context.Context, r slog.Record) error {
 		fieldsText = string(b)
 	}
 	// 年月日
-	timeStr := r.Time.Format("2006-01-02 15:04:05")
+	timeStr := r.Time.Format(time.DateTime)
 	fmt.Fprintf(q.out, "[%s] [%s] [proxy] %s %s\n", levelText, timeStr, r.Message, fieldsText)
 	return nil
 }

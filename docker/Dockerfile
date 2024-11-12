@@ -4,6 +4,7 @@ COPY . .
 RUN GOOS=linux GOARCH=$TARGETARCH go build -ldflags="-w -s" -o build/proxy-pool main.go
 
 FROM alpine:latest
+RUN apk add --no-cache tzdata
 WORKDIR /app
 COPY --from=builder /app/build/proxy-pool .
 RUN mkdir -p /etc/proxy-pool
