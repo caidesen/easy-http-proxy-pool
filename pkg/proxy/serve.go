@@ -63,6 +63,7 @@ func (s *ProxyServer) Listen(addr string) {
 	}
 	go func() {
 		slog.Info(fmt.Sprintf("代理服务启动 %s", addr))
+		slog.Debug("调试模式下将打印更多日志")
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error(fmt.Sprintf("代理服务启动失败: %v", err))
 			os.Exit(1)

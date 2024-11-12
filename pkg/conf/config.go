@@ -87,4 +87,7 @@ func init() {
 	flag.Parse()
 	LogDirPath = checkPath(LogDirPath)
 	ConfigPath = checkPath(ConfigPath)
+	if os.Getenv("PROXY_SERVER_DEBUG") == "true" {
+		IsDebug = true
+	}
 }

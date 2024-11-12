@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -61,12 +62,16 @@ type halfClosable interface {
 // Host: xxx.com:443
 // ....
 func createHttpConnectBytes(req *http.Request) []byte {
-	reqByte := []byte(fmt.Sprintf("CONNECT %s %s\r\n", req.Host, req.Proto))
-	reqByte = append(reqByte, []byte(fmt.Sprintf("Host: %s\r\n", req.Host))...)
+	reqByte := []byte(fmt.Sprintf("%s %s %s\r\n", req.Method, req.Host, req.Proto))
+	reqByte = concat(reqByte, []byte(fmt.Sprintf("Host: %s\r\n", req.Host)))
 	for k, v := range req.Header {
-		reqByte = append(reqByte, []byte(fmt.Sprintf("%s: %s\r\n", k, v[0]))...)
+		reqByte = concat(reqByte, []byte(fmt.Sprintf("%s: %s\r\n", k, v[0])))
 	}
 	reqByte = concat(reqByte, []byte{13, 10})
+	all, err := io.ReadAll(req.Body)
+	if err == nil {
+		reqByte = concat(reqByte, all)
+	}
 	return reqByte
 }
 
@@ -84,7 +89,7 @@ func checkProxyConnectTunnel(conn net.Conn) error {
 	if strings.HasPrefix(string(buf[:]), "HTTP/1.0 200 Connection established") {
 		return nil
 	}
-	return fmt.Errorf("响应报文不符合预期")
+	return fmt.Errorf("响应报文不符合预期: %s", string(bytes.TrimSpace(buf[:])))
 }
 
 // tcpConnect 发起tcp连接
@@ -110,7 +115,9 @@ func createProxyTunnel(ctx *ProxyCtx, addr string) (net.Conn, error) {
 		return nil, err
 	}
 	ctx.Debug(fmt.Sprintf("tcp连接成功 %s", addr))
-	_, err = targetConn.Write(createHttpConnectBytes(ctx.Req))
+	reqBytes := createHttpConnectBytes(ctx.Req)
+	ctx.Debug(fmt.Sprintf("http请求报文 %s", string(reqBytes)))
+	_, err = targetConn.Write(reqBytes)
 	if err != nil {
 		ctx.Warn(fmt.Sprintf("代理隧道建立失败 %s: %s", addr, err.Error()))
 		return nil, err
