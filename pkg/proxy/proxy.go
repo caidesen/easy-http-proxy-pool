@@ -265,8 +265,11 @@ func HttpRequestHandle(ctx *ProxyCtx, w http.ResponseWriter) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	defer res.Body.Close()
 	if conf.IsDebug {
 		bodyBytes, err := io.ReadAll(res.Body)
+		newBody := io.NopCloser(bytes.NewBuffer(bodyBytes))
+		defer newBody.Close()
 		if err != nil {
 			return
 		}
@@ -274,8 +277,13 @@ func HttpRequestHandle(ctx *ProxyCtx, w http.ResponseWriter) {
 			"statusCode", res.StatusCode,
 			"headers", res.Header,
 			"body", string(bodyBytes))
+		res.Body = newBody
 	}
-	defer res.Body.Close()
 	w.WriteHeader(res.StatusCode)
+	for k, vv := range res.Header {
+		for _, v := range vv {
+			w.Header().Add(k, v)
+		}
+	}
 	io.Copy(w, res.Body)
 }
