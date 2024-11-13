@@ -52,7 +52,6 @@ type ExpiringAddr struct {
 	addr       string
 	expiration time.Time
 }
-type addrStore = []*ExpiringAddr
 
 // DynamicPool 动态代理池
 type DynamicPool struct {
@@ -132,11 +131,16 @@ func (r *DynamicPool) GetAddress() (string, error) {
 	if err != nil {
 		// 禁用
 		s.Disable(err.Error())
-		slog.Info("代理源已禁用", slog.String("source", s.Name), slog.String("reason", s.disabledReason), slog.Duration("disabledFor", s.disabledFor))
+		slog.Warn("代理源已禁用",
+			slog.String("source", s.Name),
+			slog.String("reason", s.disabledReason),
+			slog.Duration("disabledFor", s.disabledFor),
+		)
 		return "", err
 	}
 	for _, addr := range ips {
 		r.cacheAddr(addr, time.Duration(int(time.Second)*s.TTL))
+		slog.Debug(fmt.Sprintf("提取代理地址 %s", addr), slog.String("source", s.Name))
 	}
 	return ips[0], nil
 }
