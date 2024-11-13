@@ -100,53 +100,45 @@ func checkProxyConnectTunnel(conn net.Conn) error {
 func tcpConnect(ctx context.Context, addr string) (net.Conn, error) {
 	dialContext := (&net.Dialer{
 		Timeout:   4 * time.Second,
-		KeepAlive: 4 * time.Second,
+		KeepAlive: 15 * time.Second,
 	}).DialContext
 	return dialContext(ctx, "tcp", addr)
 }
 
 // createProxyTunnel 创建代理隧道
 func createProxyTunnel(ctx *ProxyCtx, addr string) (net.Conn, error) {
-	addr, err := ctx.Pool.GetAddress()
-	if err != nil {
-		ctx.Warn(fmt.Sprintf("获取代理地址失败: %s", err))
-		return nil, err
-	}
-
 	targetConn, err := tcpConnect(ctx.Req.Context(), addr)
 	if err != nil {
-		ctx.Warn(fmt.Sprintf("tcp连接失败 %s: %s", addr, err.Error()))
+		ctx.Debug(fmt.Sprintf("tcp连接失败 %s: %s", addr, err.Error()))
+		ctx.Pool.DisableAddress(addr)
+		ctx.Debug(fmt.Sprintf("代理无法连接, 已移除: %s", err))
 		return nil, err
 	}
 	ctx.Debug(fmt.Sprintf("tcp连接成功 %s", addr))
 	reqBytes := createHttpConnectBytes(ctx.Req)
 	_, err = targetConn.Write(reqBytes)
 	if err != nil {
-		ctx.Warn(fmt.Sprintf("代理隧道建立失败 %s: %s", addr, err.Error()))
+		ctx.Debug(fmt.Sprintf("代理隧道建立失败 %s: %s", addr, err.Error()))
 		return nil, err
 	}
 
 	err = checkProxyConnectTunnel(targetConn)
 	if err != nil {
-		ctx.Warn(fmt.Sprintf("代理隧道连通性检查未通过 %s: %s", addr, err.Error()))
+		ctx.Debug(fmt.Sprintf("代理隧道连通性检查未通过 %s: %s", addr, err.Error()))
 		return nil, err
 	}
 	return targetConn, nil
 }
 
-// tryCreateProxyTunnel 重试创建代理隧道, 如果失败就移除代理地址
+// tryCreateProxyTunnel 重试创建代理隧道
 func tryCreateProxyTunnel(ctx *ProxyCtx) (net.Conn, error) {
 	addr, err := ctx.Pool.GetAddress()
 	if err != nil {
-		ctx.Warn(fmt.Sprintf("获取代理地址失败: %s", err))
+		ctx.Debug(fmt.Sprintf("获取代理地址失败: %s", err))
 		return nil, err
 	}
 	ctx.Debug(fmt.Sprintf("获取代理地址: %s", addr))
 	targetConn, err := createProxyTunnel(ctx, addr)
-	if err != nil {
-		ctx.Pool.DisableAddress(addr)
-		ctx.Warn(fmt.Sprintf("代理不可用, 已移除: %s", err))
-	}
 	return targetConn, err
 }
 
@@ -171,7 +163,7 @@ func HijackConnectHandle(ctx *ProxyCtx, clientConn net.Conn) {
 	if checkHostnameNeedProxy(ctx) {
 		conn, err := tryCreateProxyTunnel(ctx)
 		if err != nil {
-			ctx.Warn(fmt.Sprintf("当前远程代理不可用，降级为本地请求"))
+			ctx.Debug(fmt.Sprintf("当前远程代理不可用，降级为本地请求"))
 		} else {
 			targetConn = conn
 		}
@@ -214,7 +206,7 @@ func createNewReq(r *http.Request) (*http.Request, error) {
 }
 
 func doRequest(r *http.Request, tr *http.Transport) (*http.Response, error) {
-	client := &http.Client{Timeout: 4 * time.Second, Transport: tr}
+	client := &http.Client{Timeout: 10 * time.Second, Transport: tr}
 	return client.Do(r)
 }
 
@@ -244,23 +236,26 @@ func tryUnzip(r io.Reader) []byte {
 	return unzipped
 }
 
+// safetyHttpProxyRequest 安全的代理请求, 如果失败将会执行本机重试
+func safetyHttpProxyRequest(ctx *ProxyCtx, req *http.Request, proxyURL *url.URL) (*http.Response, error) {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	if proxyURL != nil {
+		tr.Proxy = http.ProxyURL(proxyURL)
+	}
+	resp, err := doRequest(req, tr)
+	if err != nil && proxyURL != nil {
+		ctx.Debug(fmt.Sprintf("代理请求失败: %s", err))
+		return safetyHttpProxyRequest(ctx, req, nil)
+	}
+	return resp, err
+}
 func HttpRequestHandle(ctx *ProxyCtx, w http.ResponseWriter) {
 	req, err := createNewReq(ctx.Req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	// 检查是否需要代理
-	if checkHostnameNeedProxy(ctx) {
-		proxyUrl, err := getProxyUrl(ctx)
-		if err != nil {
-			ctx.Warn(fmt.Sprintf("当前远程代理不可用，降级为本地请求: %s", err))
-		} else {
-			tr.Proxy = http.ProxyURL(proxyUrl)
-		}
 	}
 	if conf.IsDebug {
 		bodyBytes, err := io.ReadAll(req.Body)
@@ -275,9 +270,19 @@ func HttpRequestHandle(ctx *ProxyCtx, w http.ResponseWriter) {
 			slog.String("headers", string(headerText)),
 			slog.String("body", string(bodyBytes)))
 	}
-	res, err := doRequest(req, tr)
+	// 检查是否需要代理
+	var proxyUrl *url.URL
+	if checkHostnameNeedProxy(ctx) {
+		pl, err := getProxyUrl(ctx)
+		if err != nil {
+			ctx.Debug(fmt.Sprintf("当前远程代理不可用，降级为本地请求: %s", err))
+		} else {
+			proxyUrl = pl
+		}
+	}
+	res, err := safetyHttpProxyRequest(ctx, req, proxyUrl)
 	if err != nil {
-		ctx.Warn(fmt.Sprintf("代理请求失败: %s", err))
+		ctx.Debug(fmt.Sprintf("请求失败: %s", err))
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
