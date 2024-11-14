@@ -79,7 +79,8 @@ func safetyHttpProxyRequest(ctx *ProxyCtx, req *http.Request, proxyURL *url.URL)
 	resp, err := doRequest(req, tr)
 	if err != nil && proxyURL != nil {
 		ctx.Debug(fmt.Sprintf("代理请求失败: %s", err))
-		return safetyHttpProxyRequest(ctx, req, nil)
+		cpr, _ := copyRequest(req)
+		return safetyHttpProxyRequest(ctx, cpr, nil)
 	}
 	return resp, err
 }
