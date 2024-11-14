@@ -63,12 +63,13 @@ func (r *CommonIpLoader) GetAddress() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fetch ip error: %s", string(body))
 	}
-
-	for _, line := range strings.Split(string(body), "\r\n") {
-		if line == "" {
-			continue
-		}
-		ips = append(ips, line)
-	}
 	return ips, nil
+}
+
+type FixedIpLoader struct {
+	IPs []string
+}
+
+func (f *FixedIpLoader) GetAddress() ([]string, error) {
+	return f.IPs, nil
 }

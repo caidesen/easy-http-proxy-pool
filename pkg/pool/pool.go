@@ -83,7 +83,7 @@ func (r *DynamicPool) peekAddr() (string, bool) {
 	for i, item := range r.addrStore {
 		if item.expiration.After(time.Now()) {
 			// 前面的过期了了
-			r.addrStore = r.addrStore[i+1:]
+			r.addrStore = r.addrStore[i:]
 			return item.addr, true
 		}
 	}
@@ -107,6 +107,8 @@ func (r *DynamicPool) peekSource() (*DisableableSource, bool) {
 func (r *DynamicPool) fetchAddress(source *conf.ProxySource) ([]string, error) {
 	var loader Loader
 	switch source.Type {
+	case "fixed":
+		loader = &FixedIpLoader{IPs: source.FixedAddr}
 	case "common":
 	case "":
 		loader = &CommonIpLoader{FetchURL: source.FetchURL}
@@ -139,7 +141,7 @@ func (r *DynamicPool) GetAddress() (string, error) {
 		return "", err
 	}
 	for _, addr := range ips {
-		r.cacheAddr(addr, time.Duration(int(time.Second)*s.TTL))
+		r.cacheAddr(addr, s.TTL)
 		slog.Debug(fmt.Sprintf("提取代理地址 %s", addr), slog.String("source", s.Name))
 	}
 	return ips[0], nil

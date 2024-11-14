@@ -11,6 +11,7 @@ import (
 )
 
 func main() {
+	conf.AppArgsInit()
 	if conf.VersionOut {
 		fmt.Println("v0.0.1")
 		os.Exit(0)

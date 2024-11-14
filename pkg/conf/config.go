@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path"
+	"time"
 )
 
 // ProxySource 代理源
@@ -15,10 +16,11 @@ import (
 // ProxySource.FetchURL 加载链接
 // ProxySource.TTL 过期时间 秒
 type ProxySource struct {
-	Name     string `json:"name" yaml:"name"`
-	Type     string `json:"type" yaml:"type"`
-	FetchURL string `json:"fetchURL" yaml:"fetchURL"`
-	TTL      int    `json:"ttl" yaml:"TTL"`
+	Name      string        `json:"name" yaml:"name"`
+	Type      string        `json:"type" yaml:"type"`
+	FetchURL  string        `json:"fetchURL" yaml:"fetchURL"`
+	FixedAddr []string      `json:"fixedAddr" yaml:"fixedAddr"`
+	TTL       time.Duration `json:"ttl" yaml:"ttl"`
 }
 
 // Config 配置
@@ -48,7 +50,6 @@ func ReadFromFile(path string) (*Config, error) {
 	if err != nil {
 		log.Fatalf("读取文件时出错: %v", err)
 	}
-	// 解码 JSON 数据
 	var c Config
 	if err := yaml.Unmarshal(byteValue, &c); err != nil {
 		log.Fatalf("解码 JSON 时出错: %v", err)
@@ -72,7 +73,7 @@ var LogDirPath string
 var ConfigPath string
 var VersionOut bool
 
-func init() {
+func AppArgsInit() {
 	flag.StringVar(&Host, "host", "0.0.0.0", "host")
 	flag.StringVar(&Port, "port", "8001", "port")
 	flag.BoolVar(&IsDebug, "debug", false, "logout debug")
