@@ -15,14 +15,14 @@ import (
 
 func copyOrWarn(ctx *ProxyCtx, dst io.Writer, src io.Reader, wg *sync.WaitGroup) {
 	if _, err := io.Copy(dst, src); err != nil {
-		ctx.Warn(fmt.Sprintf("Error copying to client: %s", err))
+		ctx.Debug(fmt.Sprintf("Error copying to client: %s", err))
 	}
 	wg.Done()
 }
 
 func copyAndClose(ctx *ProxyCtx, dst, src halfClosable) {
 	if _, err := io.Copy(dst, src); err != nil {
-		ctx.Warn(fmt.Sprintf("Error copying to client: %s", err))
+		ctx.Debug(fmt.Sprintf("Error copying to client: %s", err))
 	}
 	dst.CloseWrite()
 	src.CloseRead()
@@ -34,9 +34,7 @@ func httpError(ctx *ProxyCtx, w io.WriteCloser, err error) {
 	if _, err := io.WriteString(w, errStr); err != nil {
 		ctx.Warn(fmt.Sprintf("Error responding to client: %s", err))
 	}
-	if err := w.Close(); err != nil {
-		ctx.Warn(fmt.Sprintf("Error closing client connection: %s", err))
-	}
+	w.Close()
 }
 
 // concat 合并数组
