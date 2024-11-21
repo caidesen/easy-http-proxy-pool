@@ -59,7 +59,7 @@ func (s *ProxyServer) Listen(addr string) {
 	server := &http.Server{
 		Addr:      addr,
 		TLSConfig: &tls.Config{InsecureSkipVerify: true},
-		Handler:   middleware.RequestID(s),
+		Handler:   middleware.Recovery(middleware.RequestID(s)),
 	}
 	go func() {
 		slog.Info(fmt.Sprintf("代理服务启动 %s", addr))
