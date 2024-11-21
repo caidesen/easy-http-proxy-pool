@@ -1,8 +1,8 @@
 package proxy
 
 import (
-	"jd-auto-proxy/pkg/conf"
-	"jd-auto-proxy/pkg/pool"
+	"easy-http-proxy-pool/pkg/conf"
+	"easy-http-proxy-pool/pkg/pool"
 	"log/slog"
 	"net/http"
 )

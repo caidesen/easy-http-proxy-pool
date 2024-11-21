@@ -3,11 +3,11 @@ package proxy
 import (
 	"context"
 	"crypto/tls"
+	"easy-http-proxy-pool/pkg/conf"
+	"easy-http-proxy-pool/pkg/pool"
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
-	"jd-auto-proxy/pkg/conf"
-	"jd-auto-proxy/pkg/pool"
 	"log/slog"
 	"net/http"
 	"os"

@@ -1,4 +1,4 @@
-APP_NAME = jd-auto-proxy
+APP_NAME = easy-http-proxy-pool
 BUILD_DIR = $(PWD)/build
 
 build: clean

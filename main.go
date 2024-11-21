@@ -1,11 +1,11 @@
 package main
 
 import (
+	"easy-http-proxy-pool/pkg/conf"
+	"easy-http-proxy-pool/pkg/logger"
+	"easy-http-proxy-pool/pkg/proxy"
 	"fmt"
 	"io"
-	"jd-auto-proxy/pkg/conf"
-	"jd-auto-proxy/pkg/logger"
-	"jd-auto-proxy/pkg/proxy"
 	"log/slog"
 	"os"
 )

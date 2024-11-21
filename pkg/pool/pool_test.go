@@ -1,7 +1,7 @@
 package pool
 
 import (
-	"jd-auto-proxy/pkg/conf"
+	"easy-http-proxy-pool/pkg/conf"
 	"log"
 	"testing"
 	"time"

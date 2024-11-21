@@ -1,4 +1,4 @@
-module jd-auto-proxy
+module easy-http-proxy-pool
 
 go 1.22
 

@@ -1,8 +1,8 @@
 package pool
 
 import (
+	"easy-http-proxy-pool/pkg/conf"
 	"fmt"
-	"jd-auto-proxy/pkg/conf"
 	"log/slog"
 	"sync"
 	"time"
