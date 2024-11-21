@@ -4,10 +4,10 @@ import (
 	"context"
 	"crypto/tls"
 	"easy-http-proxy-pool/pkg/conf"
+	"easy-http-proxy-pool/pkg/middleware"
 	"easy-http-proxy-pool/pkg/pool"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"log/slog"
 	"net/http"
 	"os"
@@ -29,7 +29,7 @@ func NewProxyServer(config *conf.Config) *ProxyServer {
 }
 
 func (s *ProxyServer) handleConnect(w http.ResponseWriter, r *http.Request) {
-	ctx := &ProxyCtx{Req: r, Pool: s.pool, conf: s.conf, TraceId: uuid.New().String()}
+	ctx := &ProxyCtx{Req: r, Pool: s.pool, conf: s.conf}
 	hij, ok := w.(http.Hijacker)
 	if !ok {
 		panic("httpserver does not support hijacking")
@@ -43,11 +43,11 @@ func (s *ProxyServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *ProxyServer) handleHttp(w http.ResponseWriter, r *http.Request) {
-	ctx := &ProxyCtx{Req: r, Pool: s.pool, conf: s.conf, TraceId: uuid.New().String()}
+	ctx := &ProxyCtx{Req: r, Pool: s.pool, conf: s.conf}
 	HttpRequestHandle(ctx, w)
 }
 
-func (s *ProxyServer) httpRequestHandle(w http.ResponseWriter, r *http.Request) {
+func (s *ProxyServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodConnect {
 		s.handleConnect(w, r)
 	} else {
@@ -59,7 +59,7 @@ func (s *ProxyServer) Listen(addr string) {
 	server := &http.Server{
 		Addr:      addr,
 		TLSConfig: &tls.Config{InsecureSkipVerify: true},
-		Handler:   http.HandlerFunc(s.httpRequestHandle),
+		Handler:   middleware.RequestID(s),
 	}
 	go func() {
 		slog.Info(fmt.Sprintf("代理服务启动 %s", addr))

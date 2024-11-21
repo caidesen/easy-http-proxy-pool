@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"easy-http-proxy-pool/pkg/conf"
+	"easy-http-proxy-pool/pkg/middleware"
 	"easy-http-proxy-pool/pkg/pool"
 	"log/slog"
 	"net/http"
@@ -9,16 +10,15 @@ import (
 
 type ProxyCtx struct {
 	// Will contain the client request from the proxy
-	Req     *http.Request
-	Pool    pool.Pool
-	conf    *conf.Config
-	TraceId string
+	Req  *http.Request
+	Pool pool.Pool
+	conf *conf.Config
 }
 
 func (ctx *ProxyCtx) getReqInfo() []interface{} {
 	return []interface{}{
 		"host", ctx.Req.Host,
-		"tranceId", ctx.TraceId,
+		"tranceId", middleware.GetReqID(ctx.Req.Context()),
 	}
 }
 
