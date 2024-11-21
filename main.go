@@ -13,7 +13,7 @@ import (
 func main() {
 	conf.AppArgsInit()
 	if conf.VersionOut {
-		fmt.Println("v0.0.1")
+		fmt.Println("v0.1.4")
 		os.Exit(0)
 	}
 	level := slog.LevelInfo
